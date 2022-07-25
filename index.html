@@ -1,0 +1,173 @@
+<html lang="english">
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
+    
+    <style>
+        div {
+            padding: 2 !important;
+        }
+    </style>
+    
+    <meta charset="UTF-8">
+    <title>Model Interpretability Frontend</title>
+</head>
+<body>
+    <div class="container" style="text-align: center; margin-top: 30px;">
+        <h1>
+            Model Interpretability Frontend
+        </h1>
+        <h6 id="time"></h6>
+
+        <div class="mb-3">
+            <label for="formFile" class="form-label"></label>
+            <input class="form-control" type="file" id="formFile" onclick="toggleSpinner()" webkitdirectory>
+        </div>
+        
+        <div class="spinner-border text-primary" role="status" id="loading-spinner" style="display: none">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        
+        <div class="mb-3">
+            <button type="button" id="toggle-show-all" class="btn btn-warning">Toggle Show All</button>
+        </div>
+        
+        <div class="accordion" id="imagesLoading">
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-pprn3073KE6tl6bjs2QrFaJGz5/SUsLqktiwsUTF55Jfv3qYSDhgCecCxMW52nD2" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <script type="text/JavaScript">
+        let showAllActive = false;
+        $('#toggle-show-all').on('click', function () {
+            if (showAllActive) {
+                $('.accordion-collapse').removeClass('show');
+                showAllActive = false;
+            } else {
+                $('.accordion-collapse').addClass('show');
+                showAllActive = true;
+            }
+        });
+
+        function toggleSpinner() {
+            let spinner = document.getElementById("loading-spinner");
+            if (spinner.style.display === "none") {
+                spinner.style.display = "inline-block";
+            } else {
+                spinner.style.display = "none";
+            }
+        }
+
+        function updateDirectoryRec(newFilesDict, folderArr) {
+            if (folderArr.length == 0) {
+                return newFilesDict;
+            }
+
+            if (newFilesDict.hasOwnProperty(folderArr[0])) {
+                newFilesDict[folderArr[0]] = updateDirectoryRec(newFilesDict[folderArr[0]], folderArr.slice(1, folderArr.length));
+                return newFilesDict;
+            } else {
+                newFilesDict[folderArr[0]] = createNewDictRec(folderArr.slice(1, folderArr.length));
+                return newFilesDict;
+            }
+
+        }
+
+        function createNewDictRec(folderArr) {
+            if (folderArr.length == 0) {
+                return [];
+            }
+            let newDict = {}
+            newDict[folderArr[0]] = createNewDictRec(folderArr.splice(1, folderArr.length))
+            return newDict;
+        }
+
+        function addToDictArr(dictionary, path_array, value) {
+            if (path_array.length == 1) {
+                dictionary[path_array[0]].push(value)
+                return dictionary;
+            }
+            dictionary[path_array[0]] = addToDictArr(dictionary[path_array[0]], path_array.splice(1, path_array.length), value);
+            return dictionary
+        }
+        
+        // https://stackoverflow.com/questions/13624450/how-to-get-the-contents-of-the-directory-from-local-pc-in-javascript
+        document.getElementById("formFile").onchange = function() {
+            filesDict = {};
+            [].slice.call(this.files).forEach(function(file) {
+                let file_path_arr = file.webkitRelativePath.split("/")
+                folderArr = file_path_arr.slice(1, file_path_arr.length - 1)
+                
+                filesDict = updateDirectoryRec(filesDict, folderArr);
+                filesDict = addToDictArr(filesDict, folderArr, file);
+
+            });
+            createDropdowns(filesDict);
+        };
+
+        function createDropdowns(filesDict) {
+            console.log("beginning of the end");
+            createDropdownsRec(filesDict, "imagesLoading");
+            toggleSpinner();
+        }
+
+        function createDropdownsRec(filesDict, startingId) {
+            console.log(startingId);
+            console.log(filesDict);
+            if (Array.isArray(filesDict)) {
+                filesDict.sort((a,b) => a.name.localeCompare(b.name));
+                for (let i = 0; i < filesDict.length; i++) {
+                    let file = filesDict[i];
+                    let reader = new FileReader();
+                    reader.onloadend = function () {
+                        $("#" + startingId).append(`<div style="display: inline-grid">${file.name}<img src=${reader.result} height="224"></div>`);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            } else {
+                let folders = Object.keys(filesDict);
+                folders.sort();
+                // style="padding: 0"
+                for (let i = 0; i < folders.length; i++) {
+                    $("#" + startingId).append(`<div class="accordion-item">
+                        <h2 class="accordion-header" id="${startingId}-${folders[i]}-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${startingId}-${folders[i]}-controls" aria-expanded="false" aria-controls="${startingId}-${folders[i]}-controls" style="padding: 4">
+                                ${folders[i]}
+                            </button>
+                        </h2>
+                        <div id="${startingId}-${folders[i]}-controls" class="accordion-collapse collapse" aria-labelledby="${startingId}-${folders[i]}-header">
+                            <div class="accordion-body" id="${startingId}-${folders[i]}">
+                            </div>
+                        </div>
+                    </div>`);
+                    createDropdownsRec(filesDict[folders[i]], `${startingId}-${folders[i]}`)
+                }
+            }
+        }
+
+        // === Update the time below ===
+        function checkTime(i) {
+            if (i < 10) {
+                i = "0" + i;
+            }
+            return i;
+        }
+
+        function startTime() {
+            var today = new Date();
+            var h = today.getHours();
+            var m = today.getMinutes();
+            var s = today.getSeconds();
+            // add a zero in front of numbers<10
+            m = checkTime(m);
+            s = checkTime(s);
+            document.getElementById('time').innerHTML = "Current Time: " + h + ":" + m + ":" + s;
+            t = setTimeout(function() {
+                startTime()
+            }, 500);
+        }
+        startTime();
+    </script>
+</body>
+</html>
