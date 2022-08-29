@@ -6,6 +6,10 @@
         div {
             padding: 2 !important;
         }
+
+        .table>:not(caption)>*>* {
+            padding: 0.1rem !important;
+        }
     </style>
     
     <meta charset="UTF-8">
@@ -119,11 +123,74 @@
                 filesDict.sort((a,b) => a.name.localeCompare(b.name));
                 for (let i = 0; i < filesDict.length; i++) {
                     let file = filesDict[i];
-                    let reader = new FileReader();
-                    reader.onloadend = function () {
-                        $("#" + startingId).append(`<div style="display: inline-grid">${file.name}<img src=${reader.result} height="224"></div>`);
-                    };
-                    reader.readAsDataURL(file);
+                    
+                    if (file.name.substring(file.name.length - 3) == "csv"){
+                        // Processing csv files
+                        let reader = new FileReader();
+                        reader.onloadend = function () {
+                            function renderCSV(csv) {
+                                console.log(csv);
+
+                                let csv_array = csv.split(/\r?\n/);
+
+                                for (let i = 0; i < csv_array.length; i++) {
+                                    csv_array[i] = csv_array[i].split(",");
+                                }
+                                console.log(csv_array);
+                                
+                                // Header html
+                                let header_html_contents = "";
+                                
+                                for (let i = 0; i < csv_array[0].length; i++) {
+                                    header_html_contents = header_html_contents.concat(`<th scope="col">${csv_array[0][i]}</th>`);
+                                }
+
+                                let head_html = `<tr>${header_html_contents}</tr>`;
+
+                                // Body html
+                                let body_html_contents = "";
+
+                                for (let i = 1; i < csv_array.length; i++) {
+                                    let tmp_row_contents = `<th scope="row">${csv_array[i][0]}</th>`;
+
+                                    for (let j = 1; j < csv_array[i].length; j++) {
+                                        tmp_row_contents = tmp_row_contents.concat(`<td>${csv_array[i][j]}</td>`);
+                                    }
+
+                                    body_html_contents = body_html_contents.concat(`<tr>${tmp_row_contents}</tr>`);
+                                }
+                                
+                                let table_html = `
+                                    <div>
+                                        ${file.name}
+                                        <table class="table">
+                                            <thead>
+                                                <tr>
+                                                ${header_html_contents}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${body_html_contents}
+                                            </tbody>
+                                        </table>
+                                    </div>`;
+                                
+                                console.log(table_html);
+
+                                $("#" + startingId).prepend(table_html);
+                            }
+                            // Issue a request to load test_file as text (don't eval it, jQuery!).
+                            jQuery.get(reader.result, renderCSV, "text");
+                        };
+                        reader.readAsDataURL(file);
+                    } else { 
+                        // Processing images
+                        let reader = new FileReader();
+                        reader.onloadend = function () {
+                            $("#" + startingId).append(`<div style="display: inline-grid">${file.name}<img src=${reader.result} height="224"></div>`);
+                        };
+                        reader.readAsDataURL(file);
+                    }
                 }
             } else {
                 let folders = Object.keys(filesDict);
